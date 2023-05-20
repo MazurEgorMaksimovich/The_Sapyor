@@ -67,6 +67,10 @@ class MainWindow(QMainWindow):
         main_layout = QVBoxLayout()
         main_layout.addLayout(toolbar)
 
+        self.grid = QGridLayout()
+        self.grid.setSpacing(5)
+        main_layout.addLayout(self.grid)
+
         central_widget.setLayout(main_layout)
         self.setCentralWidget(central_widget)
 
