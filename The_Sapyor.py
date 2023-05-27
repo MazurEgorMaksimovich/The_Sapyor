@@ -32,6 +32,7 @@ STATUS_ICONS = {
 class Cell(QWidget):
     expandable = pyqtSignal(int, int)
     clicked = pyqtSignal()
+    flagged = pyqtSignal(bool)
     game_over = pyqtSignal()
 
     def __init__(self, x, y):
@@ -107,10 +108,12 @@ class Cell(QWidget):
         elif event.button()  == Qt.MouseButton.RightButton:
             if not self.is_revealed:
                 self.toogle_flag()
+        self.clicked.emit()
     
     def toogle_flag(self):
         self.is_flagged = not self.is_flagged
         self.update()
+        self.flagged.emit(self.is_flagged)
 
 
 class MainWindow(QMainWindow):
@@ -186,6 +189,7 @@ class MainWindow(QMainWindow):
                 cell.expandable.connect(self.expand_reveal)
                 cell.clicked.connect(self.handle_click)
                 cell.game_over.connect(self.game_over)
+                cell.flagged.connect(self.handle_flag)
     
     def reset(self):
         self.mines_count = LEVELS[self.level][1]
@@ -259,6 +263,8 @@ class MainWindow(QMainWindow):
         if self.status == STATUS_READY:
             self.update_status(STATUS_PLAY)
             self._timer_start = int(time.time())
+        elif self.status == STATUS_PLAY:
+            self.check_win()
     
     def update_timer(self):
         if self.status == STATUS_PLAY:
@@ -267,6 +273,33 @@ class MainWindow(QMainWindow):
     
     def game_over(self):
         self.update_status(STATUS_FAILED)
+        self.reveal_grid()
+    
+    def reveal_grid(self):
+        for _, _, cell in self.get_all_cells():
+            if not (cell.is_flagged and self.is_mine):
+                cell.reveal_self()
+    
+    def handle_flag(self, flagged):
+        self.mines_count += -1 if flagged else 1
+        self.mines.setText(f'{self.mines_count:03d}')
+    
+    def check_win(self):
+        if self.mines_count == 0:
+            if all(cell.is_revealed or cell.is_flagged for _, _, cell in self.get_all_cells()):
+                self.update_status(STATUS_SUCCES)
+        else:
+            unrevealed = []
+            for _, _, cell in self.get_all_cells():
+                if not cell.is_revealed and not cell.is_flagged:
+                    unrevealed.append(cell)
+                    if len(unrevealed) > self.mines_count or not cell.is_mine:
+                        return
+            if len(unrevealed) == self.mines_count:
+                if all(cell.is_flagged == cell.is_mine or cell in unrevealed for _, _, cell in self.get_all_cells()):
+                    for cell in unrevealed:
+                        cell.toggle_flag()
+                    self.update_status(STATUS_SUCCES)
 
 if __name__ == '__main__':
     app = QApplication([])
